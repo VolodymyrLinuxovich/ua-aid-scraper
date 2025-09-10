@@ -17,7 +17,33 @@ The pipeline starts from Kiel’s bilateral aid table and narrows rows to a chos
 
 ## Methodology and Pipeline
 
-The pipeline proceeds through six stages. First, it normalizes Kiel headers and measures, deriving a donor slice with month stamps and a coarse bucket label (military inventory, humanitarian, loans, other). Second, it builds deterministic Google queries from the row context (donor, item text, month, amount) and from a country profile that sets language and trusted domains. Third, it resolves each query to the first organic result and downloads the target page or PDF with short timeouts and minimal retries. Fourth, it runs text analysis that searches for delivery verbs in context windows, extracts month candidates through `dateparser`, recognizes weapons and calibers via curated patterns, collects quantity phrases such as “31 Bradley” or “5,000 155 mm rounds”, and pulls money mentions both with symbols and worded currencies. Fifth, it converts currencies to EUR and, when needed, computes an estimated value by multiplying parsed quantities with per-item unit costs; stockpile transfers receive a simple depreciation based on useful-life heuristics. Sixth, it writes the outputs with hyperlinks and formatting while keeping the raw military rows for auditability and aggregating them into a concise monthly “MIT” sheet.
+1. **Normalize Kiel data**
+   - Standardize headers and measures; compute `month` from dates.
+   - Classify each row into coarse buckets: military inventory, humanitarian, loans, other.
+
+2. **Build targeted search queries**
+   - Compose deterministic Google queries from donor, item text, month, and amount.
+   - Apply a country profile (language + trusted domains) to scope results.
+
+3. **Resolve and fetch sources**
+   - Open the first organic result per query; fetch HTML or PDF.
+   - Use short timeouts and minimal retries for deterministic, fast runs.
+
+4. **Extract facts from text**
+   - Detect delivery verbs in context windows to infer status (Delivered vs Commitment).
+   - Derive an **evidence month** via `dateparser` (multilingual, 2022–2026).
+   - Recognize weapons/calibers with curated patterns; capture quantities (e.g., “31 Bradley”, “5,000 155 mm rounds”).
+   - Pull money mentions with symbols or worded currencies and multipliers.
+
+5. **Normalize & estimate values**
+   - Convert extracted amounts to **EUR** (live FX with conservative fallbacks).
+   - If no price is present, estimate from **quantity × unit cost** (transparent heuristics).
+   - Depreciate **stockpile** transfers using useful-life class heuristics.
+
+6. **Write outputs**
+   - Keep row-level **Military Raw (auto)** with links and fields for auditability.
+   - Aggregate to monthly **Military Inventory Transfer (MIT)** with a total line and compact descriptions.
+   - Produce parallel **Loans** and **Humanitarian** sheets, plus **Sources To Check** and a small **QC** view.
 
 ---
 
@@ -34,3 +60,28 @@ The pipeline proceeds through six stages. First, it normalizes Kiel headers and 
 **Currency normalization.** Values are converted to EUR using `exchangerate.host` where available; if offline, a baked-in conservative table prevents failure and keeps magnitudes reasonable.
 
 **Useful life and depreciation.** Stockpile transfers are depreciated with simple straight-line logic using class heuristics: heavy systems at roughly 25-30 years, drones around 6, non-lethal gear ~5, and munitions set to zero useful life. If the send year is known, half-life approximations are applied; otherwise the model defaults to no depreciation.
+
+## Configuration
+
+Environment variables control network timeouts, parallelism, PDF handling, and scraping breadth. Reasonable defaults balance speed with coverage and can be tightened for quick trials or relaxed for deeper runs.
+
+| Variable               | Default | Purpose                                                     |
+|------------------------|:-------:|-------------------------------------------------------------|
+| `AID_REQ_TIMEOUT`      | `7.0`   | Per-request timeout for page/PDF fetch (seconds).           |
+| `AID_GOOGLE_TIMEOUT`   | `5.0`   | Timeout for Google result pages (seconds).                  |
+| `AID_SCRAPE_LIMIT`     | `8`     | Upper bound for bootstrap/enrichment rows per run.          |
+| `AID_THREADS`          | `8`     | Worker threads for concurrent enrichment.                   |
+| `AID_TOTAL_BUDGET_SEC` | `90`    | Soft global budget for the scrape stage (seconds).          |
+| `AID_SKIP_PDF`         | `1`     | If `1`, skip PDFs for speed; set `0` to enable PDF parsing. |
+
+> Tip: For quick smoke tests, try smaller `AID_SCRAPE_LIMIT` and keep `AID_SKIP_PDF=1`. For deeper recall, increase both `AID_SCRAPE_LIMIT` and `AID_THREADS`.
+
+## Usage
+
+### Interactive run
+
+Point the script to your Kiel workbook (or a folder with it), select a donor, and the tool will write `<donor>_compiled.xlsx`.
+
+```bash
+python build_and_enrich.py
+
