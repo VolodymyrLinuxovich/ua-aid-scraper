@@ -83,5 +83,5 @@ Environment variables control network timeouts, parallelism, PDF handling, and s
 Point the script to your Kiel workbook (or a folder with it), select a donor, and the tool will write `<donor>_compiled.xlsx`.
 
 ```bash
-python build_and_enrich.py
+task_urap.py
 
