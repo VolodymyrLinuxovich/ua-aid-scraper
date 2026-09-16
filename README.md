@@ -76,12 +76,62 @@ Environment variables control network timeouts, parallelism, PDF handling, and s
 
 > Tip: For quick smoke tests, try smaller `AID_SCRAPE_LIMIT` and keep `AID_SKIP_PDF=1`. For deeper recall, increase both `AID_SCRAPE_LIMIT` and `AID_THREADS`.
 
-## Usage
+## Quick Start
 
-### Interactive run
-
-Point the script to your Kiel workbook (or a folder with it), select a donor, and the tool will write `<donor>_compiled.xlsx`.
+The script requires Python 3.10 or newer. Create an isolated environment and install the workbook and web-parsing dependencies:
 
 ```bash
-task_urap.py
+git clone https://github.com/VolodymyrLinuxovich/ua-aid-scraper.git
+cd ua-aid-scraper
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install pandas numpy openpyxl xlsxwriter requests beautifulsoup4 lxml pdfminer.six dateparser googletrans==4.0.0rc1
+```
 
+On Windows PowerShell, activate the environment with `.venv\Scripts\Activate.ps1` instead.
+
+### Input Workbook
+
+The repository includes `kiel_data.xlsx`. You can also supply another `.xlsx` workbook, but it must contain a sheet named exactly `Bilateral Assistance, MAIN DATA` with the Kiel bilateral-aid columns used by the script.
+
+The script accepts either a workbook path or a directory. When given a directory, it lists the Excel files it finds and asks you to choose one.
+
+### Run
+
+```bash
+python task_urap.py
+```
+
+At the prompts:
+
+1. Enter `kiel_data.xlsx`, another workbook path, or a directory containing the workbook.
+2. Select a donor by number or enter its name exactly as it appears in the input data.
+
+Web enrichment is enabled by default and needs internet access. Keep `AID_SKIP_PDF=1` for a faster run, or set it to `0` when PDF extraction is required:
+
+```bash
+AID_SKIP_PDF=0 python task_urap.py
+```
+
+### Expected Output
+
+The workbook is written to the current directory as `<normalized_donor>_compiled.xlsx`, for example `united_states_compiled.xlsx`. Depending on available source rows, it contains:
+
+- `Kiel data`
+- `Military Raw (auto)`
+- `Military Inventory Transfer`
+- `Loans Non-Military`
+- `Direct Humanitarian Aid`
+- `Sources To Check`
+- `QC - Top Targets` when QC rows are available
+
+The raw and source-review sheets retain URLs for manual verification. Automatically estimated values remain labeled as approximate and should be reviewed before analysis.
+
+### Synthetic Output Example
+
+This example only illustrates the `Military Inventory Transfer` sheet schema. It is synthetic and does not describe a real delivery.
+
+| Month | Total Depreciated Value (approx.) | Notable Weapons and Munitions Delivered (via PDA shipments) |
+|---|---:|---|
+| Apr 2024 | 1,000,000 | Example inventory item |
+| Total | 1,000,000 | |
